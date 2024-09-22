@@ -1,6 +1,5 @@
 import React from "react";
 import { Button, Checkbox } from "./ui";
-import { getYesterdaysDate } from "@/lib/utils";
 
 export interface TaskType {
   id: number;
@@ -17,7 +16,6 @@ interface Props {
 
 const Task = React.forwardRef<HTMLDivElement, Props>(
   ({ task, onComplete, onDelete }, ref) => {
-    const disabled = new Date(task.dueDate) <= new Date(getYesterdaysDate());
     return (
       <div
         key={task.id}
@@ -26,7 +24,6 @@ const Task = React.forwardRef<HTMLDivElement, Props>(
       >
         <Checkbox
           checked={task.completed}
-          disabled={disabled}
           onCheckedChange={() => onComplete(task.id)}
         />
         <span
@@ -41,7 +38,6 @@ const Task = React.forwardRef<HTMLDivElement, Props>(
           <Button
             variant="ghostDestructive"
             onClick={() => onDelete(task.id)}
-            disabled={disabled}
           >
             Delete
           </Button>

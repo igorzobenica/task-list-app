@@ -12,18 +12,16 @@ import { isToday, isYesterday, parseISO } from "date-fns";
 
 const App: React.FC = () => {
   const [tasks, setTasks] = useStateWithLocalStorage<TaskType[]>("tasks", []);
-  const [previousTasks, setPreviousTasks] = React.useState<TaskType[]>([]);
   const [taskToDelete, setTaskToDelete] = React.useState<number | null>(null);
   const [filter, setFilter] = React.useState<"all" | "open" | "done">("all");
   const addedTaskIdRef = React.useRef<number | null>(null);
 
-  const allTasks: TaskType[] = React.useMemo(
-    () => [...tasks, ...previousTasks],
-    [tasks, previousTasks]
-  );
+  // Keep track if previous tasks have been loaded to hide the "Load previous tasks" button
+  const [hasFetchedPrevious, setHasFetchedPrevious] =
+    useStateWithLocalStorage<boolean>("hasFetchedPrevious", false);
 
   const filteredTasks = React.useMemo(() => {
-    return allTasks.filter((task) => {
+    return tasks.filter((task) => {
       switch (filter) {
         case "all":
           return true;
@@ -35,14 +33,15 @@ const App: React.FC = () => {
           return true;
       }
     });
-  }, [allTasks, filter]);
+  }, [tasks, filter]);
 
   const { loadTasks, loading, error } = useFetchTasks();
 
-  const handleLoadPreviousTasks = async () => {
+  const handleLoadPreviousTasks = React.useCallback(async () => {
     const fetchedTasks = await loadTasks();
-    setPreviousTasks((prevTasks) => [...prevTasks, ...fetchedTasks]);
-  };
+    setTasks((prevTasks) => [...prevTasks, ...fetchedTasks]);
+    setHasFetchedPrevious(true);
+  }, [loadTasks, setTasks, setHasFetchedPrevious]);
 
   const handleAddTask = React.useCallback(
     (newTask: string, dueDate: string) => {
@@ -129,13 +128,9 @@ const App: React.FC = () => {
                 </div>
               ))}
             </div>
-            {previousTasks.length === 0 && (
+            {!hasFetchedPrevious && (
               <div className="flex justify-center items-center mt-6">
-                <Button
-                  onClick={handleLoadPreviousTasks}
-                  loading={loading}
-                  disabled={previousTasks.length > 0}
-                >
+                <Button onClick={handleLoadPreviousTasks} loading={loading}>
                   {loading ? "Loading tasks..." : "Load previous tasks ..."}
                 </Button>
               </div>
