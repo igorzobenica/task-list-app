@@ -1,33 +1,69 @@
-import React, { useState } from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Checkbox,
-  Input,
-} from "./components/ui";
-
-type Task = {
-  id: number;
-  text: string;
-  completed: boolean;
-};
+import React from "react";
+import { Button, Card, CardContent, CardHeader } from "./components/ui";
+import { TaskType } from "./components/Task";
+import TaskInput from "./components/TaskInput";
+import FilterTabs from "./components/FilterTabs";
+import TaskList from "./components/TaskList";
+import { useFetchTasks } from "./hooks";
+import DeleteTaskDialog from "./components/DeleteTaskDialog";
+import useStateWithLocalStorage from "./hooks/useStateWithLocalStorage";
+import { getSortedDates, groupTasksByDate } from "./lib/utils";
+import { isToday, isYesterday, parseISO } from "date-fns";
 
 const App: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTask, setNewTask] = useState("");
+  const [tasks, setTasks] = useStateWithLocalStorage<TaskType[]>("tasks", []);
+  const [previousTasks, setPreviousTasks] = React.useState<TaskType[]>([]);
+  const [filter, setFilter] = React.useState<"all" | "open" | "done">("all");
+  const allTasks: TaskType[] = React.useMemo(
+    () => [...tasks, ...previousTasks],
+    [tasks, previousTasks]
+  );
 
-  const addTask = () => {
+  const filteredTasks = React.useMemo(() => {
+    return allTasks.filter((task) => {
+      switch (filter) {
+        case "all":
+          return true;
+        case "open":
+          return !task.completed;
+        case "done":
+          return task.completed;
+        default:
+          return true;
+      }
+    });
+  }, [allTasks, filter]);
+
+  const { loadTasks, loading, error } = useFetchTasks();
+
+  const handleLoadPreviousTasks = async () => {
+    const fetchedTasks = await loadTasks();
+    setPreviousTasks((prevTasks) => [...prevTasks, ...fetchedTasks]);
+  };
+
+  const handleAddTask = React.useCallback(
+    (newTask: string, dueDate: string) => {
     if (!newTask.trim()) return;
     const newTaskItem = {
       id: Date.now(),
       text: newTask.trim(),
       completed: false,
-    };
-    setTasks([...tasks, newTaskItem]);
-    setNewTask("");
-  };
+        dueDate,
+      };
+      addedTaskIdRef.current = newTaskItem.id;
+      setTasks((prevTasks) => {
+        const updatedTasks = [...prevTasks, newTaskItem];
+        return updatedTasks.sort((a, b) =>
+          a.dueDate && b.dueDate
+            ? a.dueDate.localeCompare(b.dueDate)
+            : a.dueDate
+            ? -1
+            : 1
+        );
+      });
+    },
+    [setTasks]
+  );
 
   const toggleTaskCompletion = (id: number) => {
     setTasks(
@@ -57,15 +93,7 @@ const App: React.FC = () => {
             </h2>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 mb-4">
-              <Input
-                placeholder="Add a new task"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1"
-              />
-              <Button onClick={addTask}>Add</Button>
+            <TaskInput onAddTask={handleAddTask} />
             </div>
             <div>
               {tasks.map((task) => (
@@ -87,6 +115,18 @@ const App: React.FC = () => {
                 </div>
               ))}
             </div>
+            {previousTasks.length === 0 && (
+              <div className="flex justify-center items-center mt-6">
+                <Button
+                  onClick={handleLoadPreviousTasks}
+                  loading={loading}
+                  disabled={previousTasks.length > 0}
+                >
+                  {loading ? "Loading tasks..." : "Load previous tasks ..."}
+                </Button>
+              </div>
+            )}
+            {error && <p className="text-destructive mt-2">{error}</p>}
           </CardContent>
         </Card>
       </main>
