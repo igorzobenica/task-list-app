@@ -9,12 +9,15 @@ import DeleteTaskDialog from "./components/DeleteTaskDialog";
 import useStateWithLocalStorage from "./hooks/useStateWithLocalStorage";
 import { getSortedDates, groupTasksByDate } from "./lib/utils";
 import { isToday, isYesterday, parseISO } from "date-fns";
+import Layout from "./components/Layout";
+import { useToast } from "./hooks/use-toast";
 
 const App: React.FC = () => {
   const [tasks, setTasks] = useStateWithLocalStorage<TaskType[]>("tasks", []);
   const [taskToDelete, setTaskToDelete] = React.useState<number | null>(null);
   const [filter, setFilter] = React.useState<"all" | "open" | "done">("all");
   const addedTaskIdRef = React.useRef<number | null>(null);
+  const { toast } = useToast();
 
   // Keep track if previous tasks have been loaded to hide the "Load previous tasks" button
   const [hasFetchedPrevious, setHasFetchedPrevious] =
@@ -74,16 +77,26 @@ const App: React.FC = () => {
           task.id === id ? { ...task, completed: !task.completed } : task
         )
       );
+      toast({
+        title: "Task completed",
+        description: "Task marked as complete.",
+        duration: 2000,
+      });
     },
-    [tasks, setTasks]
+    [tasks, setTasks, toast]
   );
 
   const deleteTask = React.useCallback(() => {
     if (taskToDelete !== null) {
       setTasks(tasks.filter((task) => task.id !== taskToDelete));
       setTaskToDelete(null);
+      toast({
+        title: "Task removed",
+        description: "The task was successfully deleted.",
+        duration: 2000,
+      });
     }
-  }, [taskToDelete, tasks, setTasks]);
+  }, [taskToDelete, tasks, setTasks, toast]);
 
   const showDeleteDialog = taskToDelete !== null;
 
@@ -91,60 +104,54 @@ const App: React.FC = () => {
   const sortedDateKeys = getSortedDates(filteredTasks);
 
   return (
-    <div className="flex flex-col h-screen overflow-y-auto">
-      <header className="bg-primary text-white p-4 shadow-md">
-        <h1 className="text-2xl font-semibold">Task List App</h1>
-      </header>
-
-      <main className="py-12 mx-auto max-w-md">
-        <Card className="w-96">
-          <CardHeader>
-            <h2 className="text-xl font-bold">Today's tasks</h2>
-          </CardHeader>
-          <CardContent>
-            <TaskInput onAddTask={handleAddTask} />
-            <div className="flex justify-between mb-2">
-              <div className="flex-1 flex items-center">
-                <p className="text-sm text-gray-500">Due date</p>
-              </div>
-              <FilterTabs filter={filter} setFilter={setFilter} />
+    <Layout>
+      <Card className="w-96">
+        <CardHeader>
+          <h2 className="text-xl font-bold">Today's tasks</h2>
+        </CardHeader>
+        <CardContent>
+          <TaskInput onAddTask={handleAddTask} />
+          <div className="flex justify-between mb-2">
+            <div className="flex-1 flex items-center">
+              <p className="text-sm text-gray-500">Due date</p>
             </div>
-            <div className="max-h-[calc(100vh-27rem)] overflow-y-auto">
-              {sortedDateKeys.map((date) => (
-                <div key={date}>
-                  <p className="text-sm text-gray-500 my-2">
-                    {isToday(parseISO(date))
-                      ? "Today"
-                      : isYesterday(parseISO(date))
-                      ? "Yesterday"
-                      : date}
-                  </p>
-                  <TaskList
-                    tasks={groupedTasks[date]}
-                    onToggleTaskCompletion={toggleTaskCompletion}
-                    onConfirmDeleteTask={setTaskToDelete}
-                    addedTaskIdRef={addedTaskIdRef}
-                  />
-                </div>
-              ))}
-            </div>
-            {!hasFetchedPrevious && (
-              <div className="flex justify-center items-center mt-6">
-                <Button onClick={handleLoadPreviousTasks} loading={loading}>
-                  {loading ? "Loading tasks..." : "Load previous tasks ..."}
-                </Button>
+            <FilterTabs filter={filter} setFilter={setFilter} />
+          </div>
+          <div className="max-h-[calc(100vh-27rem)] overflow-y-auto">
+            {sortedDateKeys.map((date) => (
+              <div key={date}>
+                <p className="text-sm text-gray-500 my-2">
+                  {isToday(parseISO(date))
+                    ? "Today"
+                    : isYesterday(parseISO(date))
+                    ? "Yesterday"
+                    : date}
+                </p>
+                <TaskList
+                  tasks={groupedTasks[date]}
+                  onToggleTaskCompletion={toggleTaskCompletion}
+                  onConfirmDeleteTask={setTaskToDelete}
+                  addedTaskIdRef={addedTaskIdRef}
+                />
               </div>
-            )}
-            {error && <p className="text-destructive mt-2">{error}</p>}
-          </CardContent>
-        </Card>
-      </main>
+            ))}
+          </div>
+          {!hasFetchedPrevious && (
+            <div className="flex justify-center items-center mt-6">
+              <Button onClick={handleLoadPreviousTasks} loading={loading}>
+                {loading ? "Loading tasks..." : "Load previous tasks ..."}
+              </Button>
+            </div>
+          )}
+          {error && <p className="text-destructive mt-2">{error}</p>}
+        </CardContent>
+      </Card>
       <DeleteTaskDialog
         open={showDeleteDialog}
         onCancel={() => setTaskToDelete(null)}
         onConfirm={deleteTask}
       />
-    </div>
+    </Layout>
   );
 };
 
